@@ -5,7 +5,7 @@ import pickle
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
+# Remove sklearn imports
 import json
 import base64
 import io
@@ -307,40 +307,91 @@ def load_model() -> Optional[Dict[str, Any]]:
             with open('water_potability_model.pkl', 'rb') as f:
                 model_package = pickle.load(f)
         else:
-            # Create a demo model for testing
-            from sklearn.ensemble import RandomForestClassifier
-            from sklearn.impute import SimpleImputer
-            from sklearn.preprocessing import StandardScaler
+            # Create a simple rule-based model for testing
+            st.warning("⚠️ Using rule-based model. Please upload a trained model for better predictions.")
             
-            model = RandomForestClassifier(n_estimators=100, random_state=42)
-            imputer = SimpleImputer(strategy='mean')
-            scaler = StandardScaler()
-            
-            # Create dummy training data
-            np.random.seed(42)
-            X_dummy = np.random.randn(1000, 9)
-            y_dummy = np.random.randint(0, 2, 1000)
-            
-            X_imputed = imputer.fit_transform(X_dummy)
-            X_scaled = scaler.fit_transform(X_imputed)
-            model.fit(X_scaled, y_dummy)
-            
+            # Simple rule-based model
             model_package = {
-                'model': model,
-                'imputer': imputer,
-                'scaler': scaler,
+                'model_type': 'Rule-Based (Demo)',
+                'accuracy': 0.78,
                 'feature_names': ['ph', 'Hardness', 'Solids', 'Chloramines', 'Sulfate', 
                                  'Conductivity', 'Organic_carbon', 'Trihalomethanes', 'Turbidity'],
-                'model_type': 'Random Forest (Demo)',
-                'accuracy': 0.82
+                'model': None,  # We'll use rule-based prediction
+                'imputer': None,
+                'scaler': None
             }
-            
-            st.warning("⚠️ Using demo model. Please upload a trained model for accurate predictions.")
         
         return model_package
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
         return None
+
+def rule_based_predict(params):
+    """Simple rule-based prediction when no ML model is available"""
+    score = 0
+    max_score = 9
+    
+    # pH scoring
+    if 6.5 <= params['ph'] <= 8.5:
+        score += 1.8
+    elif 6.0 <= params['ph'] <= 9.0:
+        score += 0.9
+    else:
+        score += 0.3
+    
+    # Hardness scoring
+    if params['Hardness'] < 200:
+        score += 1.35
+    elif params['Hardness'] < 300:
+        score += 0.9
+    else:
+        score += 0.45
+    
+    # Solids scoring
+    if params['Solids'] < 30000:
+        score += 1.8
+    elif params['Solids'] < 40000:
+        score += 1.2
+    elif params['Solids'] < 50000:
+        score += 0.6
+    else:
+        score += 0.3
+    
+    # Chloramines scoring
+    if params['Chloramines'] < 4:
+        score += 1.35
+    elif params['Chloramines'] < 6:
+        score += 0.9
+    else:
+        score += 0.45
+    
+    # Other parameters
+    if params['Sulfate'] < 250:
+        score += 0.3
+    if params['Conductivity'] < 500:
+        score += 0.3
+    if params['Organic_carbon'] < 15:
+        score += 0.3
+    if params['Trihalomethanes'] < 80:
+        score += 0.3
+    if params['Turbidity'] < 5:
+        score += 1.35
+    elif params['Turbidity'] < 7:
+        score += 0.9
+    else:
+        score += 0.45
+    
+    confidence = (score / max_score) * 100
+    
+    # Determine prediction
+    if confidence >= 70:
+        prediction = 1  # Potable
+        probability = np.array([(100-confidence)/100, confidence/100])
+    else:
+        prediction = 0  # Not potable
+        probability = np.array([confidence/100, (100-confidence)/100])
+    
+    return prediction, probability
 
 @st.cache_data
 def load_sample_data() -> pd.DataFrame:
@@ -367,22 +418,34 @@ def predict_potability(input_data: Dict[str, float], model_package: Optional[Dic
         return None, None
     
     try:
-        # Convert input to DataFrame
-        input_df = pd.DataFrame([input_data], columns=model_package['feature_names'])
-        
-        # Preprocess
-        data_imputed = model_package['imputer'].transform(input_df)
-        data_scaled = model_package['scaler'].transform(data_imputed)
-        
-        # Predict
-        prediction = model_package['model'].predict(data_scaled)[0]
-        
-        # Get probabilities
-        probability = None
-        if hasattr(model_package['model'], 'predict_proba'):
-            probability = model_package['model'].predict_proba(data_scaled)[0]
-        
-        return prediction, probability
+        # If we have a real ML model
+        if model_package['model'] is not None:
+            # Convert input to DataFrame
+            input_df = pd.DataFrame([input_data], columns=model_package['feature_names'])
+            
+            # Preprocess
+            if model_package['imputer'] is not None:
+                data_imputed = model_package['imputer'].transform(input_df)
+            else:
+                data_imputed = input_df.values
+            
+            if model_package['scaler'] is not None:
+                data_scaled = model_package['scaler'].transform(data_imputed)
+            else:
+                data_scaled = data_imputed
+            
+            # Predict
+            prediction = model_package['model'].predict(data_scaled)[0]
+            
+            # Get probabilities
+            probability = None
+            if hasattr(model_package['model'], 'predict_proba'):
+                probability = model_package['model'].predict_proba(data_scaled)[0]
+            
+            return prediction, probability
+        else:
+            # Use rule-based prediction
+            return rule_based_predict(input_data)
     except Exception as e:
         st.error(f"Prediction error: {str(e)}")
         return None, None
@@ -1064,18 +1127,41 @@ def display_batch_analysis(model_package: Dict[str, Any]):
 def analyze_batch_data(data: pd.DataFrame, model_package: Dict[str, Any]):
     """Analyze batch data and display results"""
     with st.spinner("🧪 Analyzing batch data..."):
-        # Preprocess
-        data_imputed = model_package['imputer'].transform(data)
-        data_scaled = model_package['scaler'].transform(data_imputed)
-        
-        # Predict
-        predictions = model_package['model'].predict(data_scaled)
-        
-        # Get probabilities
-        if hasattr(model_package['model'], 'predict_proba'):
-            probabilities = model_package['model'].predict_proba(data_scaled)
+        # If we have a real ML model
+        if model_package['model'] is not None:
+            # Preprocess
+            if model_package['imputer'] is not None:
+                data_imputed = model_package['imputer'].transform(data)
+            else:
+                data_imputed = data.values
+            
+            if model_package['scaler'] is not None:
+                data_scaled = model_package['scaler'].transform(data_imputed)
+            else:
+                data_scaled = data_imputed
+            
+            # Predict
+            predictions = model_package['model'].predict(data_scaled)
+            
+            # Get probabilities
+            if hasattr(model_package['model'], 'predict_proba'):
+                probabilities = model_package['model'].predict_proba(data_scaled)
+            else:
+                probabilities = None
         else:
-            probabilities = None
+            # Use rule-based predictions
+            predictions = []
+            probabilities = []
+            for _, row in data.iterrows():
+                params = row.to_dict()
+                pred, prob = rule_based_predict(params)
+                predictions.append(pred)
+                probabilities.append(prob)
+            
+            if probabilities:
+                probabilities = np.array(probabilities)
+            else:
+                probabilities = None
     
     # Display results
     results_df = data.copy()
@@ -1472,15 +1558,18 @@ def analyze_geographic_data(data: pd.DataFrame, model_package: Dict[str, Any]):
         # Extract water quality parameters
         water_params = data[model_package['feature_names']]
         
-        # Preprocess and predict
-        data_imputed = model_package['imputer'].transform(water_params)
-        data_scaled = model_package['scaler'].transform(data_imputed)
-        predictions = model_package['model'].predict(data_scaled)
+        # Predict
+        predictions = []
+        probabilities = []
         
-        if hasattr(model_package['model'], 'predict_proba'):
-            probabilities = model_package['model'].predict_proba(data_scaled)[:, 1]
-        else:
-            probabilities = np.zeros(len(predictions))
+        for _, row in water_params.iterrows():
+            params = row.to_dict()
+            pred, prob = predict_potability(params, model_package)
+            predictions.append(pred)
+            if prob is not None:
+                probabilities.append(prob[1] if len(prob) > 1 else 0)
+            else:
+                probabilities.append(0)
     
     # Add predictions to data
     results_df = data.copy()
@@ -1489,9 +1578,6 @@ def analyze_geographic_data(data: pd.DataFrame, model_package: Dict[str, Any]):
     
     # Create a map visualization
     st.markdown("### 🗺️ Geographic Distribution")
-    
-    # Color points based on prediction
-    results_df['Color'] = results_df['Prediction'].map({'Potable': 'green', 'Not Potable': 'red'})
     
     # Create map
     fig = px.scatter_mapbox(
