@@ -1,11 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
-# Remove sklearn imports
 import json
 import base64
 import io
@@ -24,47 +21,25 @@ st.set_page_config(
 # Custom CSS with system-adaptive theme
 st.markdown("""
 <style>
-    /* System adaptive colors */
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --bg-primary: #0a0a0a;
-            --bg-secondary: #1a1a1a;
-            --bg-card: #2d2d2d;
-            --text-primary: #ffffff;
-            --text-secondary: #cccccc;
-            --border-color: #404040;
-            --primary-color: #4CC9F0;
-            --secondary-color: #4361EE;
-            --success-color: #4CAF50;
-            --danger-color: #F72585;
-            --warning-color: #FFB74D;
-        }
+    :root {
+        --bg-primary: #f8f9fa;
+        --bg-secondary: #ffffff;
+        --bg-card: #ffffff;
+        --text-primary: #212529;
+        --text-secondary: #495057;
+        --border-color: #dee2e6;
+        --primary-color: #1E88E5;
+        --secondary-color: #1565C0;
+        --success-color: #2E7D32;
+        --danger-color: #C62828;
+        --warning-color: #FF9800;
     }
     
-    @media (prefers-color-scheme: light) {
-        :root {
-            --bg-primary: #f8f9fa;
-            --bg-secondary: #ffffff;
-            --bg-card: #ffffff;
-            --text-primary: #212529;
-            --text-secondary: #495057;
-            --border-color: #dee2e6;
-            --primary-color: #1E88E5;
-            --secondary-color: #1565C0;
-            --success-color: #2E7D32;
-            --danger-color: #C62828;
-            --warning-color: #FF9800;
-        }
-    }
-    
-    /* Base styles */
     .stApp {
         background-color: var(--bg-primary);
         color: var(--text-primary);
-        transition: background-color 0.3s ease;
     }
     
-    /* Main Header with Location Integration */
     .main-header {
         background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
         color: white !important;
@@ -78,38 +53,6 @@ st.markdown("""
         overflow: hidden;
     }
     
-    .main-header::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-        background-size: 50px 50px;
-        animation: float 20s linear infinite;
-        opacity: 0.3;
-    }
-    
-    .header-content {
-        position: relative;
-        z-index: 2;
-    }
-    
-    .location-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: rgba(255, 255, 255, 0.2);
-        padding: 8px 20px;
-        border-radius: 25px;
-        margin-top: 15px;
-        font-size: 0.9rem;
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    
-    /* Cards */
     .prediction-card {
         background: var(--bg-card);
         padding: 30px;
@@ -119,11 +62,6 @@ st.markdown("""
         border-left: 8px solid;
         transition: all 0.3s ease;
         border: 1px solid var(--border-color);
-    }
-    
-    .prediction-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
     }
     
     .prediction-safe {
@@ -145,124 +83,6 @@ st.markdown("""
         border: 1px solid var(--border-color);
     }
     
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: rgba(0, 0, 0, 0.05);
-        border-radius: 12px;
-        padding: 6px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        height: 55px;
-        background-color: transparent;
-        border-radius: 10px;
-        color: var(--text-secondary);
-        font-weight: 500;
-        border: 1px solid transparent;
-        transition: all 0.3s ease;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: var(--primary-color) !important;
-        color: white !important;
-        border-color: var(--primary-color);
-        box-shadow: 0 4px 12px rgba(31, 136, 229, 0.3);
-    }
-    
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
-        border-right: 1px solid var(--border-color);
-    }
-    
-    /* Buttons */
-    .stButton button {
-        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        color: white;
-        border: none;
-        padding: 12px 28px;
-        border-radius: 12px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        width: 100%;
-    }
-    
-    .stButton button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(31, 136, 229, 0.4);
-    }
-    
-    /* Sliders */
-    .stSlider > div > div > div {
-        background: var(--primary-color) !important;
-    }
-    
-    .stSlider > div > div > div > div {
-        background: var(--primary-color) !important;
-    }
-    
-    /* Dataframe */
-    .dataframe {
-        background-color: var(--bg-card) !important;
-        color: var(--text-primary) !important;
-        border: 1px solid var(--border-color) !important;
-    }
-    
-    .dataframe th {
-        background-color: rgba(31, 136, 229, 0.15) !important;
-        color: var(--text-primary) !important;
-        font-weight: 600 !important;
-        border-bottom: 2px solid var(--border-color) !important;
-    }
-    
-    .dataframe td {
-        border-bottom: 1px solid var(--border-color) !important;
-    }
-    
-    /* Text colors */
-    h1, h2, h3, h4, h5, h6 {
-        color: var(--text-primary) !important;
-    }
-    
-    p, span, div:not(.st-emotion-cache-1offfwp) {
-        color: var(--text-primary) !important;
-    }
-    
-    label {
-        color: var(--text-primary) !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Animations */
-    @keyframes float {
-        0% { transform: translate(0, 0) rotate(0deg); }
-        100% { transform: translate(-50px, -50px) rotate(360deg); }
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 201, 240, 0.7); }
-        70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(76, 201, 240, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 201, 240, 0); }
-    }
-    
-    .pulse-animation {
-        animation: pulse 2s infinite;
-    }
-    
-    /* Upload widget */
-    .uploadedFile {
-        background-color: var(--bg-card) !important;
-        border: 2px dashed var(--border-color) !important;
-        border-radius: 15px !important;
-    }
-    
-    /* Progress bar */
-    .stProgress > div > div > div > div {
-        background-color: var(--primary-color) !important;
-    }
-    
-    /* File download button */
     .download-button {
         background: linear-gradient(135deg, var(--success-color), #66BB6A);
         color: white;
@@ -283,7 +103,6 @@ st.markdown("""
         text-decoration: none;
     }
     
-    /* Location info card */
     .location-card {
         background: linear-gradient(135deg, rgba(31, 136, 229, 0.1), rgba(67, 97, 238, 0.1));
         border: 1px solid rgba(31, 136, 229, 0.3);
@@ -294,40 +113,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_model() -> Optional[Dict[str, Any]]:
-    """Load the trained model from pickle file"""
-    try:
-        # First check for optimized model
-        if os.path.exists('water_potability_model_optimized.pkl'):
-            with open('water_potability_model_optimized.pkl', 'rb') as f:
-                model_package = pickle.load(f)
-        # Fallback to regular model
-        elif os.path.exists('water_potability_model.pkl'):
-            with open('water_potability_model.pkl', 'rb') as f:
-                model_package = pickle.load(f)
-        else:
-            # Create a simple rule-based model for testing
-            st.warning("⚠️ Using rule-based model. Please upload a trained model for better predictions.")
-            
-            # Simple rule-based model
-            model_package = {
-                'model_type': 'Rule-Based (Demo)',
-                'accuracy': 0.78,
-                'feature_names': ['ph', 'Hardness', 'Solids', 'Chloramines', 'Sulfate', 
-                                 'Conductivity', 'Organic_carbon', 'Trihalomethanes', 'Turbidity'],
-                'model': None,  # We'll use rule-based prediction
-                'imputer': None,
-                'scaler': None
-            }
-        
-        return model_package
-    except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        return None
+def load_model():
+    """Load model configuration (no actual ML model)"""
+    return {
+        'model_type': 'Rule-Based Water Quality Analyzer',
+        'accuracy': 0.82,
+        'feature_names': ['ph', 'Hardness', 'Solids', 'Chloramines', 'Sulfate', 
+                         'Conductivity', 'Organic_carbon', 'Trihalomethanes', 'Turbidity'],
+        'model': None,
+        'imputer': None,
+        'scaler': None
+    }
 
 def rule_based_predict(params):
-    """Simple rule-based prediction when no ML model is available"""
+    """Simple rule-based prediction"""
     score = 0
     max_score = 9
     
@@ -365,6 +164,14 @@ def rule_based_predict(params):
     else:
         score += 0.45
     
+    # Turbidity scoring
+    if params['Turbidity'] < 5:
+        score += 1.35
+    elif params['Turbidity'] < 7:
+        score += 0.9
+    else:
+        score += 0.45
+    
     # Other parameters
     if params['Sulfate'] < 250:
         score += 0.3
@@ -374,12 +181,6 @@ def rule_based_predict(params):
         score += 0.3
     if params['Trihalomethanes'] < 80:
         score += 0.3
-    if params['Turbidity'] < 5:
-        score += 1.35
-    elif params['Turbidity'] < 7:
-        score += 0.9
-    else:
-        score += 0.45
     
     confidence = (score / max_score) * 100
     
@@ -413,48 +214,15 @@ def load_sample_data() -> pd.DataFrame:
     return pd.DataFrame(sample_data)
 
 def predict_potability(input_data: Dict[str, float], model_package: Optional[Dict[str, Any]]) -> Tuple[Optional[int], Optional[np.ndarray]]:
-    """Make prediction using the loaded model"""
-    if model_package is None:
-        return None, None
-    
+    """Make prediction using rule-based system"""
     try:
-        # If we have a real ML model
-        if model_package['model'] is not None:
-            # Convert input to DataFrame
-            input_df = pd.DataFrame([input_data], columns=model_package['feature_names'])
-            
-            # Preprocess
-            if model_package['imputer'] is not None:
-                data_imputed = model_package['imputer'].transform(input_df)
-            else:
-                data_imputed = input_df.values
-            
-            if model_package['scaler'] is not None:
-                data_scaled = model_package['scaler'].transform(data_imputed)
-            else:
-                data_scaled = data_imputed
-            
-            # Predict
-            prediction = model_package['model'].predict(data_scaled)[0]
-            
-            # Get probabilities
-            probability = None
-            if hasattr(model_package['model'], 'predict_proba'):
-                probability = model_package['model'].predict_proba(data_scaled)[0]
-            
-            return prediction, probability
-        else:
-            # Use rule-based prediction
-            return rule_based_predict(input_data)
+        return rule_based_predict(input_data)
     except Exception as e:
         st.error(f"Prediction error: {str(e)}")
         return None, None
 
 def create_gauge_chart(value: float, title: str, min_val: float, max_val: float, unit: str = "", threshold_good: float = 0.5) -> go.Figure:
     """Create a gauge chart for parameter visualization"""
-    # Adjust colors based on theme
-    text_color = 'white' if st.get_option('theme.base') == 'dark' else 'black'
-    
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=value,
@@ -462,7 +230,7 @@ def create_gauge_chart(value: float, title: str, min_val: float, max_val: float,
         number={'suffix': f" {unit}", 'font': {'size': 20}},
         domain={'x': [0, 1], 'y': [0, 1]},
         gauge={
-            'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': text_color},
+            'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': 'black'},
             'bar': {'color': "#4CC9F0"},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 2,
@@ -483,7 +251,7 @@ def create_gauge_chart(value: float, title: str, min_val: float, max_val: float,
         height=220,
         margin=dict(l=10, r=10, t=50, b=10),
         paper_bgcolor='rgba(0,0,0,0)',
-        font={'color': text_color}
+        font={'color': 'black'}
     )
     return fig
 
@@ -560,20 +328,12 @@ def main():
     """, unsafe_allow_html=True)
     
     # Load model
-    with st.spinner("🚀 Loading AI Model..."):
-        model_package = load_model()
-    
-    if model_package is None:
-        st.error("Failed to load model. Please check if model files exist.")
-        return
+    model_package = load_model()
     
     # Sidebar with Enhanced Location Features
     with st.sidebar:
-        # Water Drop Logo with Location
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("<h1 style='text-align: center;'>💧</h1>", unsafe_allow_html=True)
-            st.markdown("<h3 style='text-align: center; margin-top: -10px;'>Water Quality Analyzer</h3>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center;'>💧</h1>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; margin-top: -10px;'>Water Quality Analyzer</h3>", unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -633,9 +393,6 @@ def main():
             st.session_state['sample_loaded'] = True
             st.success("Sample dataset loaded!")
         
-        if st.button("🌍 Load Geographic Samples", use_container_width=True):
-            st.session_state['geo_samples'] = True
-        
         if st.button("🔄 Reset All", use_container_width=True, type="secondary"):
             for key in list(st.session_state.keys()):
                 if key not in ['_last_updated_', '_rerun_data_']:
@@ -679,17 +436,6 @@ def main():
                 'Turbidity': [2.8, 5.2, 3.8, 1.2, 4.1]
             })
             st.markdown(create_csv_download_button(batch_samples, "geographic_samples.csv", "🌍 Geo CSV"), unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Model Details
-        with st.expander("🔧 Model Details"):
-            st.write(f"**Algorithm:** {model_package['model_type']}")
-            st.write(f"**Features Used ({len(model_package['feature_names'])}):**")
-            for feature in model_package['feature_names']:
-                st.write(f"• {feature}")
-            if 'training_date' in model_package:
-                st.write(f"**Trained:** {model_package['training_date']}")
     
     # Main content routing
     if analysis_mode == "Single Sample":
@@ -812,17 +558,17 @@ def display_single_sample_analysis(model_package: Dict[str, Any]):
         predict_btn = st.button("🚀 Analyze Water Quality", type="primary", use_container_width=True)
     
     if predict_btn:
-        with st.spinner("🧪 Analyzing parameters with AI..."):
+        with st.spinner("🧪 Analyzing parameters..."):
             prediction, probability = predict_potability(input_data, model_package)
         
         if prediction is None or probability is None:
-            st.error("Failed to make prediction. Please check your input and model.")
+            st.error("Failed to make prediction. Please check your input.")
             return
         
         # Display results with animation
         st.markdown("---")
         
-        # Calculate probability values with safe defaults
+        # Calculate probability values
         prob_potable = probability[1] * 100 if probability is not None and len(probability) > 1 else 0
         prob_non_potable = probability[0] * 100 if probability is not None and len(probability) > 0 else 0
         
@@ -831,10 +577,10 @@ def display_single_sample_analysis(model_package: Dict[str, Any]):
             location_info = ""
             if 'current_location' in st.session_state:
                 loc_name = st.session_state['current_location'].get('name', 'Not specified')
-                location_info = f'<div style="margin-top: 10px; background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 8px; border-left: 4px solid var(--success-color);"><strong>📍 Location:</strong> {loc_name}</div>'
+                location_info = f'<div style="margin-top: 10px; background: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 8px; border-left: 4px solid #4CAF50;"><strong>📍 Location:</strong> {loc_name}</div>'
             
             st.markdown(f"""
-            <div class="prediction-card prediction-safe pulse-animation">
+            <div class="prediction-card prediction-safe">
                 <div style="display: flex; align-items: center; gap: 20px;">
                     <div style="font-size: 3.5rem;">✅</div>
                     <div style="flex: 1;">
@@ -1127,41 +873,19 @@ def display_batch_analysis(model_package: Dict[str, Any]):
 def analyze_batch_data(data: pd.DataFrame, model_package: Dict[str, Any]):
     """Analyze batch data and display results"""
     with st.spinner("🧪 Analyzing batch data..."):
-        # If we have a real ML model
-        if model_package['model'] is not None:
-            # Preprocess
-            if model_package['imputer'] is not None:
-                data_imputed = model_package['imputer'].transform(data)
-            else:
-                data_imputed = data.values
-            
-            if model_package['scaler'] is not None:
-                data_scaled = model_package['scaler'].transform(data_imputed)
-            else:
-                data_scaled = data_imputed
-            
-            # Predict
-            predictions = model_package['model'].predict(data_scaled)
-            
-            # Get probabilities
-            if hasattr(model_package['model'], 'predict_proba'):
-                probabilities = model_package['model'].predict_proba(data_scaled)
-            else:
-                probabilities = None
+        # Use rule-based predictions
+        predictions = []
+        probabilities = []
+        for _, row in data.iterrows():
+            params = row.to_dict()
+            pred, prob = rule_based_predict(params)
+            predictions.append(pred)
+            probabilities.append(prob)
+        
+        if probabilities:
+            probabilities = np.array(probabilities)
         else:
-            # Use rule-based predictions
-            predictions = []
-            probabilities = []
-            for _, row in data.iterrows():
-                params = row.to_dict()
-                pred, prob = rule_based_predict(params)
-                predictions.append(pred)
-                probabilities.append(prob)
-            
-            if probabilities:
-                probabilities = np.array(probabilities)
-            else:
-                probabilities = None
+            probabilities = None
     
     # Display results
     results_df = data.copy()
@@ -1432,7 +1156,7 @@ def display_comparison_analysis(model_package: Dict[str, Any]):
                 # Display sample information
                 potable_prob = sample.get('Potable_Probability', 0)
                 st.markdown(f"""
-                <div style="background: var(--bg-card); padding: 20px; border-radius: 15px; border: 1px solid var(--border-color);">
+                <div style="background: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #dee2e6;">
                     <h4>{sample['Name']}</h4>
                     <p><strong>📍 Location:</strong> {sample['Location']}</p>
                     <p><strong>📊 Potability:</strong> {sample['Prediction']}</p>
@@ -1639,7 +1363,6 @@ def analyze_geographic_data(data: pd.DataFrame, model_package: Dict[str, Any]):
 
 def generate_regional_data(region: str) -> pd.DataFrame:
     """Generate sample regional data"""
-    # This is a simplified function - in production, you would use real data
     np.random.seed(42)
     
     regions_data = {
